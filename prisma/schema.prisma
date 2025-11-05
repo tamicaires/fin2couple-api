@@ -1,0 +1,353 @@
+// Finduo - SaaS de Finanças para Casais - Schema Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// AUTHENTICATION & MULTI-TENANCY ENTITIES
+// ============================================
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password_hash String
+  name          String
+  role          UserRole @default(USER)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  // Multi-Tenancy: A user can be part of a Couple (Tenant)
+  couple_as_a   Couple?  @relation("UserA")
+  couple_as_b   Couple?  @relation("UserB")
+
+  transactions_paid Transaction[] @relation("PaidBy")
+  game_profile      UserGameProfile?
+
+  @@map("users")
+}
+
+// ============================================
+// GAMIFICATION ENTITIES
+// ============================================
+
+model UserGameProfile {
+  id               String   @id @default(uuid())
+  user_id          String   @unique
+  current_xp       Int      @default(0)
+  total_xp         Int      @default(0)
+  level            Int      @default(1)
+  current_streak   Int      @default(0)
+  longest_streak   Int      @default(0)
+  last_activity_at DateTime @default(now())
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  // Relations
+  user         User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  achievements UserAchievement[]
+
+  @@index([user_id])
+  @@map("user_game_profiles")
+}
+
+model Achievement {
+  id          String   @id @default(uuid())
+  key         String   @unique // e.g., "FIRST_TRANSACTION", "WEEK_STREAK"
+  name        String   // e.g., "Primeira Transação"
+  description String   // e.g., "Registre sua primeira transação"
+  icon        String   // emoji or icon name
+  xp_reward   Int      @default(0) // XP bonus when achieved
+  category    String   // e.g., "TRANSACTIONS", "STREAK", "BUDGET"
+  created_at  DateTime @default(now())
+
+  // Relations
+  user_achievements UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id             String   @id @default(uuid())
+  user_id        String
+  achievement_id String
+  achieved_at    DateTime @default(now())
+
+  // Relations
+  profile     UserGameProfile @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  achievement Achievement     @relation(fields: [achievement_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, achievement_id])
+  @@index([user_id])
+  @@index([achievement_id])
+  @@map("user_achievements")
+}
+
+model Couple {
+  id                       String   @id @default(uuid())
+  user_id_a                String   @unique
+  user_id_b                String   @unique
+
+  // Free Spending Monthly configured for each partner
+  free_spending_a_monthly   Decimal  @default(0) @db.Decimal(10, 2)
+  free_spending_b_monthly   Decimal  @default(0) @db.Decimal(10, 2)
+
+  // Remaining Free Spending - Dynamically updated
+  free_spending_a_remaining Decimal  @default(0) @db.Decimal(10, 2)
+  free_spending_b_remaining Decimal  @default(0) @db.Decimal(10, 2)
+
+  // Day of month to reset Free Spending (1-31)
+  reset_day                 Int      @default(1)
+
+  // Financial Model Configuration
+  financial_model              FinancialModel @default(CUSTOM)
+  allow_personal_accounts      Boolean        @default(true)
+  allow_private_transactions   Boolean        @default(true)
+
+  created_at                DateTime @default(now())
+  updated_at                DateTime @updatedAt
+
+  // Relations
+  user_a       User          @relation("UserA", fields: [user_id_a], references: [id], onDelete: Cascade)
+  user_b       User          @relation("UserB", fields: [user_id_b], references: [id], onDelete: Cascade)
+
+  accounts                       Account[]
+  transactions                   Transaction[]
+  categories                     Category[]
+  subscription                   Subscription?
+  invites                        CoupleInvite[]
+  recurring_transaction_templates RecurringTransactionTemplate[]
+
+  @@map("couples")
+}
+
+model CoupleInvite {
+  id                 String              @id @default(uuid())
+  inviter_id         String              // User who is inviting
+  invitee_name       String              // Name of the person being invited
+  invitee_email      String              // Email of the person being invited
+  token              String              @unique // Unique token for the invite link
+  status             CoupleInviteStatus  @default(PENDING)
+  couple_id          String?             @unique // Set when invite is accepted
+  expires_at         DateTime            // Expiration date
+  created_at         DateTime            @default(now())
+  accepted_at        DateTime?
+
+  // Relations
+  couple Couple? @relation(fields: [couple_id], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([inviter_id])
+  @@index([invitee_email])
+  @@map("couple_invites")
+}
+
+enum CoupleInviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELED
+}
+
+// ============================================
+// PLAN & SUBSCRIPTION ENTITIES (SaaS)
+// ============================================
+
+model Plan {
+  id                     String   @id @default(uuid())
+  name                   String   @unique
+  price_monthly          Decimal  @db.Decimal(10, 2)
+  max_accounts           Int      @default(5)
+  max_transactions_month Int      @default(100)
+  features               Json     // List of enabled features
+  created_at             DateTime @default(now())
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id         String             @id @default(uuid())
+  couple_id  String             @unique
+  plan_id    String
+  status     SubscriptionStatus @default(TRIAL)
+  start_date DateTime           @default(now())
+  end_date   DateTime?
+  created_at DateTime           @default(now())
+  updated_at DateTime           @updatedAt
+
+  // Stripe Integration
+  stripe_customer_id     String? @unique
+  stripe_subscription_id String? @unique
+  stripe_price_id        String?
+
+  // Relations
+  couple Couple @relation(fields: [couple_id], references: [id], onDelete: Cascade)
+  plan   Plan   @relation(fields: [plan_id], references: [id])
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  CANCELED
+  EXPIRED
+}
+
+// ============================================
+// FINANCIAL ENTITIES
+// ============================================
+
+model Account {
+  id              String      @id @default(uuid())
+  couple_id       String      // FK - Tenant Isolation
+  owner_id        String?     // Null = Joint Account
+  name            String
+  type            AccountType @default(CHECKING)
+  current_balance Decimal     @default(0) @db.Decimal(10, 2)
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
+
+  // Relations
+  couple       Couple        @relation(fields: [couple_id], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([couple_id])
+  @@map("accounts")
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  INVESTMENT
+  CASH
+  CREDIT_CARD
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  couple_id   String   // FK - Tenant Isolation
+  name        String
+  icon        String   @default("Circle") // Lucide icon name
+  color       String   @default("#6b7280") // Hex color
+  type        TransactionType? // null = both types
+  is_default  Boolean  @default(false) // System default categories
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  // Relations
+  couple       Couple        @relation(fields: [couple_id], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([couple_id])
+  @@map("categories")
+}
+
+model Transaction {
+  id                String                @id @default(uuid())
+  couple_id         String                // FK - Tenant Isolation
+  type              TransactionType
+  amount            Decimal               @db.Decimal(10, 2)
+  description       String?
+  paid_by_id        String                // Who paid
+  account_id        String                // Source/destination account
+  is_couple_expense Boolean               @default(false) // Joint expense or individual
+  is_free_spending  Boolean               @default(false) // Deduct from free spending allowance
+  visibility        TransactionVisibility @default(SHARED) // SHARED, FREE_SPENDING, or PRIVATE
+  category_id       String?               // FK to Category
+  transaction_date  DateTime              @default(now())
+  created_at        DateTime              @default(now())
+
+  // Installment fields (Parcelamento)
+  installment_group_id String? // Groups all installments together
+  installment_number   Int?    // Current installment number (1, 2, 3...)
+  total_installments   Int?    // Total number of installments (12, 24, etc)
+
+  // Recurring fields (Recorrência)
+  recurring_template_id String? // FK to recurring template
+
+  // Relations
+  couple             Couple                           @relation(fields: [couple_id], references: [id], onDelete: Cascade)
+  paid_by            User                             @relation("PaidBy", fields: [paid_by_id], references: [id])
+  account            Account                          @relation(fields: [account_id], references: [id])
+  category           Category?                        @relation(fields: [category_id], references: [id], onDelete: SetNull)
+  recurring_template RecurringTransactionTemplate?    @relation(fields: [recurring_template_id], references: [id], onDelete: SetNull)
+
+  @@index([couple_id])
+  @@index([paid_by_id])
+  @@index([transaction_date])
+  @@index([category_id])
+  @@index([installment_group_id])
+  @@index([recurring_template_id])
+  @@map("transactions")
+}
+
+model RecurringTransactionTemplate {
+  id                String                @id @default(uuid())
+  couple_id         String                // FK - Tenant Isolation
+  type              TransactionType
+  amount            Decimal               @db.Decimal(10, 2)
+  description       String?
+  paid_by_id        String                // Who pays
+  account_id        String                // Source/destination account
+  is_couple_expense Boolean               @default(false)
+  is_free_spending  Boolean               @default(false)
+  visibility        TransactionVisibility @default(SHARED)
+  category_id       String?
+
+  // Recurrence configuration
+  frequency       RecurrenceFrequency // DAILY, WEEKLY, MONTHLY, YEARLY
+  interval        Int                 @default(1) // Every X days/weeks/months
+  start_date      DateTime
+  end_date        DateTime?           // null = no end date
+  next_occurrence DateTime
+  is_active       Boolean             @default(true)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // Relations
+  couple       Couple        @relation(fields: [couple_id], references: [id], onDelete: Cascade)
+  transactions Transaction[] // Generated transactions history
+
+  @@index([couple_id])
+  @@index([next_occurrence])
+  @@index([is_active])
+  @@map("recurring_transaction_templates")
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum TransactionVisibility {
+  SHARED         // 👥 Compartilhado - both partners see full details
+  FREE_SPENDING  // 💰 Gasto Pessoal - deducted from free spending allowance
+  PRIVATE        // 🔒 Privado - partner sees amount but not details
+}
+
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum FinancialModel {
+  TRANSPARENT           // 🤝 Transparência Total - no personal accounts, no private transactions
+  AUTONOMOUS            // 🔀 Autonomia com Colaboração - allows personal accounts and private transactions
+  CUSTOM                // 💎 Personalizado - user configures individually
+}
+
+enum UserRole {
+  USER                  // 👤 Regular user
+  ADMIN                 // 🔑 Super admin with full access
+}
