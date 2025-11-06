@@ -14,14 +14,10 @@ async function bootstrap() {
 
   console.log('�� [3/6] Configuring CORS...');
   app.enableCors({
-    origin: [
-      'http://localhost:5173',
-      'http://192.168.0.190:5173', // IP local para acesso mobile
-      /^http:\/\/192\.168\.\d+\.\d+:5173$/, // Qualquer IP da rede local
-      'https://fincouple.facter.com.br', // Frontend na Vercel
-      /^https:\/\/.*\.vercel\.app$/, // Preview deployments da Vercel
-    ],
+    origin: process.env.FRONTEND_URL || '*',
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
   console.log('✅ [3/6] CORS configured');
 
