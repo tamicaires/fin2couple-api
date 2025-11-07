@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '@infra/http/auth/guards/jwt-auth.guard';
 import { CoupleGuard } from '@infra/http/auth/guards/couple.guard';
 import { CurrentUser } from '@infra/http/auth/decorators/current-user.decorator';
 import { CoupleId } from '@infra/http/auth/decorators/couple-id.decorator';
+import { UserId } from '@infra/http/auth/decorators/user-id.decorator';
 import { AuthenticatedUser } from '@shared/types/authenticated-user.type';
 import { TransactionVisibility } from '@core/enum/transaction-visibility.enum';
 
@@ -124,6 +125,7 @@ export class TransactionController {
   })
   async listTransactions(
     @CoupleId() coupleId: string,
+    @UserId() userId: string,
     @Query('limit') limit?: number,
     @Query('cursor') cursor?: string,
     @Query('type') type?: string,
@@ -135,6 +137,7 @@ export class TransactionController {
   ) {
     return this.listTransactionsUseCase.execute({
       coupleId,
+      userId,
       limit: limit ? Number(limit) : undefined,
       cursor,
       type,
