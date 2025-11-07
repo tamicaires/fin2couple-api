@@ -111,10 +111,10 @@ export class InstallmentTemplate {
       couple_id: z.string().uuid({ message: 'Couple ID must be a valid UUID' }),
       description: z.string().optional(),
       total_amount: z
-        .number({ required_error: 'Total amount is required' })
+        .number({ message: 'Total amount is required' })
         .positive({ message: 'Total amount must be positive' }),
       total_installments: z
-        .number({ required_error: 'Total installments is required' })
+        .number({ message: 'Total installments is required' })
         .int({ message: 'Total installments must be an integer' })
         .min(2, { message: 'Minimum 2 installments required' })
         .max(120, { message: 'Maximum 120 installments allowed' }),
@@ -124,7 +124,7 @@ export class InstallmentTemplate {
       is_couple_expense: z.boolean().optional(),
       is_free_spending: z.boolean().optional(),
       visibility: z.nativeEnum(TransactionVisibility),
-      first_due_date: z.date({ required_error: 'First due date is required' }),
+      first_due_date: z.date({ message: 'First due date is required' }),
       is_active: z.boolean().optional(),
       created_at: z.date().optional(),
       updated_at: z.date().optional(),

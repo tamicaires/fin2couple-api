@@ -102,7 +102,7 @@ export class RecurringOccurrence {
     const schema = z.object({
       id: z.string().uuid().optional(),
       template_id: z.string().uuid({ message: 'Template ID must be a valid UUID' }),
-      due_date: z.date({ required_error: 'Due date is required' }),
+      due_date: z.date({ message: 'Due date is required' }),
       status: z.nativeEnum(OccurrenceStatus).optional(),
       transaction_id: z.string().uuid().nullable().optional(),
       created_at: z.date().optional(),

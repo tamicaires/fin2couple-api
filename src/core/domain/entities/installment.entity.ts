@@ -119,13 +119,13 @@ export class Installment {
       id: z.string().uuid().optional(),
       template_id: z.string().uuid({ message: 'Template ID must be a valid UUID' }),
       installment_number: z
-        .number({ required_error: 'Installment number is required' })
+        .number({ message: 'Installment number is required' })
         .int({ message: 'Installment number must be an integer' })
         .positive({ message: 'Installment number must be positive' }),
       amount: z
-        .number({ required_error: 'Amount is required' })
+        .number({ message: 'Amount is required' })
         .positive({ message: 'Amount must be positive' }),
-      due_date: z.date({ required_error: 'Due date is required' }),
+      due_date: z.date({ message: 'Due date is required' }),
       status: z.nativeEnum(OccurrenceStatus).optional(),
       transaction_id: z.string().uuid().nullable().optional(),
       created_at: z.date().optional(),
