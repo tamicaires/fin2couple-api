@@ -164,4 +164,25 @@ export class InstallmentTemplate {
       updated_at: this.updated_at,
     };
   }
+
+  // Custom JSON serialization to avoid _is_active in output
+  toJSON() {
+    return {
+      id: this.id,
+      couple_id: this.couple_id,
+      description: this.description,
+      total_amount: this.total_amount,
+      total_installments: this.total_installments,
+      paid_by_id: this.paid_by_id,
+      account_id: this.account_id,
+      category_id: this.category_id,
+      is_couple_expense: this.is_couple_expense,
+      is_free_spending: this.is_free_spending,
+      visibility: this.visibility,
+      first_due_date: this.first_due_date,
+      is_active: this._is_active,
+      created_at: this.created_at,
+      updated_at: this.updated_at,
+    };
+  }
 }

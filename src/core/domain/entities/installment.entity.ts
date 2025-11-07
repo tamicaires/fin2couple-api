@@ -158,4 +158,19 @@ export class Installment {
       updated_at: this.updated_at,
     };
   }
+
+  // Custom JSON serialization to avoid _status and _transaction_id in output
+  toJSON() {
+    return {
+      id: this.id,
+      template_id: this.template_id,
+      installment_number: this.installment_number,
+      amount: this.amount,
+      due_date: this.due_date,
+      status: this._status,
+      transaction_id: this._transaction_id,
+      created_at: this.created_at,
+      updated_at: this.updated_at,
+    };
+  }
 }

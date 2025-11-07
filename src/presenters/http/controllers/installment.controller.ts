@@ -43,13 +43,27 @@ export class InstallmentController {
   // Template routes
   @Get('templates')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'List all installment templates for the couple' })
+  @ApiOperation({ summary: 'List installment templates for the couple with pagination (active by default)' })
   @ApiResponse({
     status: 200,
-    description: 'Templates retrieved successfully',
+    description: 'Templates retrieved successfully with hasInactiveTemplates flag',
   })
-  async listTemplates(@CoupleId() coupleId: string) {
-    return this.templateRepository.findByCoupleId(coupleId);
+  async listTemplates(
+    @CoupleId() coupleId: string,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+    @Query('showInactive') showInactive?: string,
+  ) {
+    const pagination = {
+      limit: limit ? parseInt(limit, 10) : 20,
+      cursor: cursor || undefined,
+    };
+
+    // If showInactive is true, get all templates (both active and inactive)
+    // Otherwise, get only active templates (default behavior)
+    const activeOnly = showInactive === 'true' ? false : true;
+
+    return this.templateRepository.findByCoupleId(coupleId, pagination, activeOnly);
   }
 
   @Get('templates/active')

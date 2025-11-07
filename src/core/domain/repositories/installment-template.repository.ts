@@ -1,5 +1,5 @@
 import { InstallmentTemplate } from '../entities/installment-template.entity';
-import { PaginationInput, PaginationOutput } from '@shared/types/pagination.type';
+import { PaginationInput, InstallmentTemplatePaginationOutput } from '@shared/types/pagination.type';
 
 /**
  * Installment Template Repository Interface (Contract)
@@ -18,7 +18,8 @@ export interface IInstallmentTemplateRepository {
   findByCoupleId(
     coupleId: string,
     pagination?: PaginationInput,
-  ): Promise<PaginationOutput<InstallmentTemplate>>;
+    activeOnly?: boolean,
+  ): Promise<InstallmentTemplatePaginationOutput<InstallmentTemplate>>;
 
   /**
    * Find active templates for a couple

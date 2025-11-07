@@ -95,12 +95,12 @@ export class CreateInstallmentTemplateUseCase {
   private createTemplate(input: CreateInstallmentTemplateInput): InstallmentTemplate {
     return InstallmentTemplate.create({
       couple_id: input.couple_id,
-      description: input.description,
+      description: input.description ?? undefined,
       total_amount: input.total_amount,
       total_installments: input.total_installments,
       paid_by_id: input.paid_by_id,
       account_id: input.account_id,
-      category_id: input.category_id,
+      category_id: input.category_id ?? undefined,
       is_couple_expense: input.is_couple_expense,
       is_free_spending: input.is_free_spending,
       visibility: input.visibility,
