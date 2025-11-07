@@ -4,6 +4,7 @@ import { PaginationInput, PaginationOutput } from '@shared/types/pagination.type
 
 export interface TransactionFilters {
   coupleId: string;
+  userId?: string; // For privacy filtering
   type?: TransactionType;
   paidById?: string;
   accountId?: string;

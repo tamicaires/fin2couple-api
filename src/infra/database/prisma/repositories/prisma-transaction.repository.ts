@@ -67,6 +67,35 @@ export class PrismaTransactionRepository implements ITransactionRepository {
       couple_id: filters.coupleId,
     };
 
+    // Privacy filtering based on accounts and visibility
+    if (filters.userId) {
+      where.OR = [
+        // 1. Transactions from joint accounts (owner_id = null) with SHARED visibility
+        {
+          account: { owner_id: null },
+          visibility: 'SHARED',
+        },
+        // 2. Transactions from joint accounts (owner_id = null) with PRIVATE visibility, but only user's own
+        {
+          account: { owner_id: null },
+          visibility: 'PRIVATE',
+          paid_by_id: filters.userId,
+        },
+        // 3. All transactions from user's personal accounts
+        {
+          account: { owner_id: filters.userId },
+        },
+        // 4. Transactions from other's personal accounts with SHARED visibility
+        {
+          AND: [
+            { account: { owner_id: { not: null } } },
+            { account: { owner_id: { not: filters.userId } } },
+            { visibility: 'SHARED' },
+          ],
+        },
+      ];
+    }
+
     if (filters.type) where.type = filters.type;
     if (filters.paidById) where.paid_by_id = filters.paidById;
     if (filters.accountId) where.account_id = filters.accountId;
@@ -93,6 +122,9 @@ export class PrismaTransactionRepository implements ITransactionRepository {
       take: limit + 1,
       cursor: cursor ? { id: cursor } : undefined,
       orderBy: { transaction_date: 'desc' },
+      include: {
+        account: true, // Include account to check owner_id
+      },
     });
 
     const hasMore = transactions.length > limit;
