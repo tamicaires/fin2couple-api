@@ -65,6 +65,21 @@ export class PrismaAccountRepository implements IAccountRepository {
     return accounts.map(PrismaAccountMapper.toDomain);
   }
 
+  async findVisibleAccounts(coupleId: string, userId: string): Promise<Account[]> {
+    const accounts = await this.prisma.account.findMany({
+      where: {
+        couple_id: coupleId,
+        OR: [
+          { owner_id: null }, // Joint accounts
+          { owner_id: userId }, // User's personal accounts
+        ],
+      },
+      orderBy: { created_at: 'desc' },
+    });
+
+    return accounts.map(PrismaAccountMapper.toDomain);
+  }
+
   async create(account: Account): Promise<Account> {
     const created = await this.prisma.account.create({
       data: PrismaAccountMapper.toPrisma(account),
