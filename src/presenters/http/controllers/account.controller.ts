@@ -9,6 +9,7 @@ import { UpdateAccountDto } from '../dtos/account/update-account.dto';
 import { JwtAuthGuard } from '@infra/http/auth/guards/jwt-auth.guard';
 import { CoupleGuard } from '@infra/http/auth/guards/couple.guard';
 import { CoupleId } from '@infra/http/auth/decorators/couple-id.decorator';
+import { UserId } from '@infra/http/auth/decorators/user-id.decorator';
 
 @ApiTags('Accounts')
 @ApiBearerAuth()
@@ -35,6 +36,7 @@ export class AccountController {
   })
   async createAccount(
     @CoupleId() coupleId: string,
+    @UserId() userId: string,
     @Body() dto: CreateAccountDto,
   ) {
     return this.createAccountUseCase.execute({
@@ -42,6 +44,7 @@ export class AccountController {
       name: dto.name,
       type: dto.type,
       initial_balance: dto.initial_balance,
+      owner_id: dto.is_personal ? userId : null,
     });
   }
 
