@@ -8,8 +8,10 @@ import { AccountType } from '@core/enum/account-type.enum';
 export interface UpdateAccountInput {
   coupleId: string;
   accountId: string;
+  userId: string;
   name?: string;
   type?: AccountType;
+  is_personal?: boolean;
 }
 
 export interface UpdateAccountOutput {
@@ -23,12 +25,14 @@ export interface UpdateAccountOutput {
 /**
  * Update Account Use Case
  *
- * Updates account name and/or type
+ * Updates account name, type, and/or privacy
  *
  * Business Rules:
  * - Account must exist and belong to the couple
  * - Balance cannot be updated directly (use transactions)
- * - Only name and type can be updated
+ * - Name, type, and privacy (is_personal) can be updated
+ * - Changing to personal sets owner_id to current user
+ * - Changing to joint sets owner_id to null
  */
 @Injectable()
 export class UpdateAccountUseCase implements IUseCase<UpdateAccountInput, UpdateAccountOutput> {
@@ -43,6 +47,8 @@ export class UpdateAccountUseCase implements IUseCase<UpdateAccountInput, Update
     this.logger.logUseCase('UpdateAccountUseCase', {
       coupleId: input.coupleId,
       accountId: input.accountId,
+      userId: input.userId,
+      is_personal: input.is_personal,
     });
 
     // Get account
@@ -58,6 +64,10 @@ export class UpdateAccountUseCase implements IUseCase<UpdateAccountInput, Update
     if (input.type !== undefined) {
       account.type = input.type;
     }
+    if (input.is_personal !== undefined) {
+      // Change account privacy
+      account.owner_id = input.is_personal ? input.userId : null;
+    }
 
     account.updated_at = new Date();
 
@@ -67,6 +77,8 @@ export class UpdateAccountUseCase implements IUseCase<UpdateAccountInput, Update
     this.logger.log('Account updated successfully', {
       accountId: updated.id,
       coupleId: input.coupleId,
+      is_personal: updated.owner_id !== null,
+      owner_id: updated.owner_id,
     });
 
     return {

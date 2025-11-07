@@ -10,6 +10,7 @@ export interface IAccountRepository {
   findByCoupleId(coupleId: string): Promise<Account[]>;
   findByOwnerId(ownerId: string): Promise<Account[]>;
   findJointAccounts(coupleId: string): Promise<Account[]>;
+  findVisibleAccounts(coupleId: string, userId: string): Promise<Account[]>;
   create(account: Account): Promise<Account>;
   update(id: string, data: Partial<Account>): Promise<Account>;
   delete(id: string): Promise<void>;

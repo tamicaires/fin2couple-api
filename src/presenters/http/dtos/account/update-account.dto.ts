@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, MinLength, MaxLength } from 'class-validator';
+import { IsString, IsEnum, IsOptional, IsBoolean, MinLength, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { AccountType } from '@core/enum/account-type.enum';
 
@@ -23,4 +23,13 @@ export class UpdateAccountDto {
   @IsOptional()
   @IsEnum(AccountType)
   type?: AccountType;
+
+  @ApiProperty({
+    example: true,
+    description: 'Change account privacy: true = personal (private), false = joint (shared)',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  is_personal?: boolean;
 }

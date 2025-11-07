@@ -6,6 +6,7 @@ import { AccountType } from '@core/enum/account-type.enum';
 
 export interface ListAccountsInput {
   coupleId: string;
+  userId: string;
 }
 
 export interface ListAccountsOutput {
@@ -14,6 +15,8 @@ export interface ListAccountsOutput {
     name: string;
     type: AccountType;
     balance: number;
+    is_joint: boolean;
+    owner_id: string | null;
     created_at: Date;
   }>;
   total_balance: number;
@@ -22,11 +25,13 @@ export interface ListAccountsOutput {
 /**
  * List Accounts Use Case
  *
- * Returns all accounts for the couple with total balance
+ * Returns accounts visible to the user with total balance
  *
  * Business Rules:
  * - Only returns accounts for the specified couple (tenant isolation)
- * - Calculates total balance across all accounts
+ * - Returns joint accounts (owner_id = null) - visible to both partners
+ * - Returns user's personal accounts (owner_id = userId) - visible only to owner
+ * - Calculates total balance across visible accounts only
  * - Ordered by creation date (newest first)
  */
 @Injectable()
@@ -41,20 +46,27 @@ export class ListAccountsUseCase implements IUseCase<ListAccountsInput, ListAcco
   async execute(input: ListAccountsInput): Promise<ListAccountsOutput> {
     this.logger.logUseCase('ListAccountsUseCase', {
       coupleId: input.coupleId,
+      userId: input.userId,
     });
 
-    // Get all accounts for couple
-    const accounts = await this.accountRepository.findByCoupleId(input.coupleId);
+    // Get visible accounts for user (optimized query)
+    // Returns: joint accounts + user's personal accounts
+    const visibleAccounts = await this.accountRepository.findVisibleAccounts(
+      input.coupleId,
+      input.userId,
+    );
 
-    // Calculate total balance
-    const total_balance = accounts.reduce((sum, account) => sum + account.balance, 0);
+    // Calculate total balance (only from visible accounts)
+    const total_balance = visibleAccounts.reduce((sum, account) => sum + account.balance, 0);
 
     return {
-      accounts: accounts.map((account) => ({
+      accounts: visibleAccounts.map((account) => ({
         id: account.id,
         name: account.name,
         type: account.type,
         balance: account.balance,
+        is_joint: account.isJointAccount(),
+        owner_id: account.owner_id,
         created_at: account.created_at,
       })),
       total_balance,

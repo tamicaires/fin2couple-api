@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { CreateAccountUseCase } from '@application/account/useCases/create-account/create-account.use-case';
 import { ListAccountsUseCase } from '@application/account/useCases/list-accounts/list-accounts.use-case';
@@ -9,6 +9,7 @@ import { UpdateAccountDto } from '../dtos/account/update-account.dto';
 import { JwtAuthGuard } from '@infra/http/auth/guards/jwt-auth.guard';
 import { CoupleGuard } from '@infra/http/auth/guards/couple.guard';
 import { CoupleId } from '@infra/http/auth/decorators/couple-id.decorator';
+import { UserId } from '@infra/http/auth/decorators/user-id.decorator';
 
 @ApiTags('Accounts')
 @ApiBearerAuth()
@@ -35,6 +36,7 @@ export class AccountController {
   })
   async createAccount(
     @CoupleId() coupleId: string,
+    @UserId() userId: string,
     @Body() dto: CreateAccountDto,
   ) {
     return this.createAccountUseCase.execute({
@@ -42,6 +44,7 @@ export class AccountController {
       name: dto.name,
       type: dto.type,
       initial_balance: dto.initial_balance,
+      owner_id: dto.is_personal ? userId : null,
     });
   }
 
@@ -52,11 +55,14 @@ export class AccountController {
     status: 200,
     description: 'Accounts retrieved successfully',
   })
-  async listAccounts(@CoupleId() coupleId: string) {
-    return this.listAccountsUseCase.execute({ coupleId });
+  async listAccounts(
+    @CoupleId() coupleId: string,
+    @UserId() userId: string,
+  ) {
+    return this.listAccountsUseCase.execute({ coupleId, userId });
   }
 
-  @Put(':id')
+  @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update account details' })
   @ApiParam({
@@ -74,14 +80,17 @@ export class AccountController {
   })
   async updateAccount(
     @CoupleId() coupleId: string,
+    @UserId() userId: string,
     @Param('id') accountId: string,
     @Body() dto: UpdateAccountDto,
   ) {
     return this.updateAccountUseCase.execute({
       coupleId,
       accountId,
+      userId,
       name: dto.name,
       type: dto.type,
+      is_personal: dto.is_personal,
     });
   }
 
