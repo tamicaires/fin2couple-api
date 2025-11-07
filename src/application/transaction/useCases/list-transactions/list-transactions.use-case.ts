@@ -7,6 +7,7 @@ import { TransactionType } from '@core/enum/transaction-type.enum';
 
 export interface ListTransactionsInput {
   coupleId: string;
+  userId: string;
   limit?: number;
   cursor?: string;
   type?: string;
@@ -37,10 +38,15 @@ export interface ListTransactionsOutput {
 /**
  * List Transactions Use Case
  *
- * Returns paginated list of transactions for the couple
+ * Returns paginated list of transactions visible to the user
  *
  * Business Rules:
  * - Only returns transactions for the specified couple (tenant isolation)
+ * - Privacy filtering:
+ *   1. Transactions from joint accounts with SHARED visibility
+ *   2. Transactions from joint accounts with PRIVATE visibility (only user's own)
+ *   3. All transactions from user's personal accounts
+ *   4. Transactions from other's personal accounts with SHARED visibility
  * - Supports cursor-based pagination for performance
  * - Supports filtering by type, category, date range, free spending
  * - Ordered by transaction_date DESC (newest first)
@@ -59,6 +65,7 @@ export class ListTransactionsUseCase
   async execute(input: ListTransactionsInput): Promise<ListTransactionsOutput> {
     this.logger.logUseCase('ListTransactionsUseCase', {
       coupleId: input.coupleId,
+      userId: input.userId,
       limit: input.limit,
       filters: {
         type: input.type,
@@ -68,10 +75,11 @@ export class ListTransactionsUseCase
       },
     });
 
-    // Get transactions with pagination and filters
+    // Get transactions with pagination, filters, and privacy rules
     const result = await this.transactionRepository.findByFilters(
       {
         coupleId: input.coupleId,
+        userId: input.userId, // Privacy filtering
         type: input.type as TransactionType | undefined,
         category: input.category,
         accountId: input.accountId,
