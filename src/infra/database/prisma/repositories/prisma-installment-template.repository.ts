@@ -4,7 +4,7 @@ import { PrismaTenantService } from '../prisma-tenant.service';
 import { IInstallmentTemplateRepository } from '@core/domain/repositories/installment-template.repository';
 import { InstallmentTemplate } from '@core/domain/entities/installment-template.entity';
 import { PrismaInstallmentTemplateMapper } from '../mappers/prisma-installment-template.mapper';
-import { PaginationInput, PaginationOutput } from '@shared/types/pagination.type';
+import { PaginationInput, InstallmentTemplatePaginationOutput } from '@shared/types/pagination.type';
 
 @Injectable()
 export class PrismaInstallmentTemplateRepository implements IInstallmentTemplateRepository {
@@ -29,12 +29,23 @@ export class PrismaInstallmentTemplateRepository implements IInstallmentTemplate
   async findByCoupleId(
     coupleId: string,
     pagination?: PaginationInput,
-  ): Promise<PaginationOutput<InstallmentTemplate>> {
+    activeOnly?: boolean,
+  ): Promise<InstallmentTemplatePaginationOutput<InstallmentTemplate>> {
     const limit = pagination?.limit || 20;
     const cursor = pagination?.cursor;
 
+    // Default to active only if not specified
+    const shouldFilterActive = activeOnly !== undefined ? activeOnly : true;
+
+    const where: Record<string, unknown> = { couple_id: coupleId };
+    // Only filter by is_active if shouldFilterActive is true
+    // If false, don't add any is_active filter (returns all)
+    if (shouldFilterActive === true) {
+      where.is_active = true;
+    }
+
     const templates = await this.prisma.installmentTemplate.findMany({
-      where: { couple_id: coupleId },
+      where,
       take: limit + 1,
       cursor: cursor ? { id: cursor } : undefined,
       orderBy: { first_due_date: 'asc' },
@@ -44,10 +55,20 @@ export class PrismaInstallmentTemplateRepository implements IInstallmentTemplate
     const data = hasMore ? templates.slice(0, -1) : templates;
     const nextCursor = hasMore ? data[data.length - 1].id : null;
 
+    // Always check if there are inactive templates (for the toggle button)
+    const inactiveCount = await this.prisma.installmentTemplate.count({
+      where: {
+        couple_id: coupleId,
+        is_active: false,
+      },
+    });
+    const hasInactiveTemplates = inactiveCount > 0;
+
     return {
       data: data.map(PrismaInstallmentTemplateMapper.toDomain),
       nextCursor,
       hasMore,
+      hasInactiveTemplates,
     };
   }
 

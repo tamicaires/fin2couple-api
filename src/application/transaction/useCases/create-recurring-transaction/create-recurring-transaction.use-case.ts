@@ -1,7 +1,9 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { IRecurringTransactionTemplateRepository } from '@core/domain/repositories/recurring-transaction-template.repository';
+import { IRecurringOccurrenceRepository } from '@core/domain/repositories/recurring-occurrence.repository';
 import { ITransactionRepository } from '@core/domain/repositories/transaction.repository';
 import { RecurringTransactionTemplate } from '@core/domain/entities/recurring-transaction-template.entity';
+import { RecurringOccurrence } from '@core/domain/entities/recurring-occurrence.entity';
 import { Transaction } from '@core/domain/entities/transaction.entity';
 import { TransactionType } from '@core/enum/transaction-type.enum';
 import { TransactionVisibility } from '@core/enum/transaction-visibility.enum';
@@ -25,34 +27,23 @@ export interface CreateRecurringTransactionInput {
   interval: number;
   start_date: Date;
   end_date: Date | null;
-  create_first_transaction: boolean; // If true, creates the first transaction immediately
+  create_first_transaction: boolean;
+  months_ahead?: number;
 }
 
 export interface CreateRecurringTransactionOutput {
   template: RecurringTransactionTemplate;
+  occurrences: RecurringOccurrence[];
   first_transaction: Transaction | null;
 }
 
-/**
- * Use Case: Create Recurring Transaction
- *
- * Creates a template for recurring transactions that will be generated
- * automatically by a scheduler job.
- *
- * Business Rules:
- * - Template stores all transaction details
- * - Optionally creates the first transaction immediately
- * - Scheduler will generate future transactions based on frequency
- * - Template can be paused/resumed/deleted
- *
- * Design Pattern: Factory Method
- * - TransactionFactory creates transactions from templates
- */
 @Injectable()
 export class CreateRecurringTransactionUseCase {
   constructor(
     @Inject('IRecurringTransactionTemplateRepository')
     private readonly templateRepository: IRecurringTransactionTemplateRepository,
+    @Inject('IRecurringOccurrenceRepository')
+    private readonly occurrenceRepository: IRecurringOccurrenceRepository,
     @Inject('ITransactionRepository')
     private readonly transactionRepository: ITransactionRepository,
   ) {}
@@ -60,7 +51,6 @@ export class CreateRecurringTransactionUseCase {
   async execute(input: CreateRecurringTransactionInput): Promise<CreateRecurringTransactionOutput> {
     this.validateInput(input);
 
-    // Create recurrence configuration value object
     const recurrenceConfig = RecurrenceConfig.create(
       input.frequency,
       input.interval,
@@ -68,23 +58,23 @@ export class CreateRecurringTransactionUseCase {
       input.end_date,
     );
 
-    // Create the template
     const template = this.createTemplate(input, recurrenceConfig);
-
-    // Save template
     const createdTemplate = await this.templateRepository.create(template);
 
-    // Optionally create first transaction
+    const monthsAhead = input.months_ahead || 3;
+    const occurrences = await this.generateOccurrences(createdTemplate, monthsAhead);
+
     let firstTransaction: Transaction | null = null;
-    if (input.create_first_transaction) {
-      firstTransaction = await this.createFirstTransaction(createdTemplate);
-      // Update next occurrence after creating first transaction
-      createdTemplate.updateNextOccurrence();
-      await this.templateRepository.updateNextOccurrence(createdTemplate.id, createdTemplate.next_occurrence);
+    if (input.create_first_transaction && occurrences.length > 0) {
+      const firstOccurrence = occurrences[0];
+      firstTransaction = await this.createFirstTransaction(createdTemplate, firstOccurrence);
+      firstOccurrence.markAsPaid(firstTransaction.id);
+      await this.occurrenceRepository.markAsPaid(firstOccurrence.id, firstTransaction.id);
     }
 
     return {
       template: createdTemplate,
+      occurrences,
       first_transaction: firstTransaction,
     };
   }
@@ -93,11 +83,9 @@ export class CreateRecurringTransactionUseCase {
     if (input.amount <= 0) {
       throw new Error('Amount must be positive');
     }
-
     if (input.interval < 1) {
       throw new Error('Interval must be at least 1');
     }
-
     if (input.end_date && input.end_date <= input.start_date) {
       throw new Error('End date must be after start date');
     }
@@ -127,41 +115,97 @@ export class CreateRecurringTransactionUseCase {
     });
   }
 
-  /**
-   * Factory Method: Creates a transaction from a template
-   */
-  private async createFirstTransaction(template: RecurringTransactionTemplate): Promise<Transaction> {
+  private async generateOccurrences(
+    template: RecurringTransactionTemplate,
+    monthsAhead: number,
+  ): Promise<RecurringOccurrence[]> {
+    const occurrences: RecurringOccurrence[] = [];
+    const endDate = this.calculateEndDate(template, monthsAhead);
+    let currentDate = new Date(template.next_occurrence);
+
+    while (currentDate <= endDate) {
+      const occurrence = RecurringOccurrence.create({
+        template_id: template.id,
+        due_date: new Date(currentDate),
+      });
+      occurrences.push(occurrence);
+
+      currentDate = this.calculateNextDate(currentDate, template.frequency, template.interval);
+
+      if (template.end_date && currentDate > template.end_date) {
+        break;
+      }
+    }
+
+    return occurrences.length > 0 ? await this.occurrenceRepository.createMany(occurrences) : [];
+  }
+
+  private calculateEndDate(template: RecurringTransactionTemplate, monthsAhead: number): Date {
+    const endDate = new Date();
+    endDate.setMonth(endDate.getMonth() + monthsAhead);
+    if (template.end_date && template.end_date < endDate) {
+      return template.end_date;
+    }
+    return endDate;
+  }
+
+  private calculateNextDate(
+    currentDate: Date,
+    frequency: RecurrenceFrequency,
+    interval: number,
+  ): Date {
+    const nextDate = new Date(currentDate);
+    switch (frequency) {
+      case RecurrenceFrequency.DAILY:
+        nextDate.setDate(nextDate.getDate() + interval);
+        break;
+      case RecurrenceFrequency.WEEKLY:
+        nextDate.setDate(nextDate.getDate() + interval * 7);
+        break;
+      case RecurrenceFrequency.MONTHLY:
+        nextDate.setMonth(nextDate.getMonth() + interval);
+        break;
+      case RecurrenceFrequency.YEARLY:
+        nextDate.setFullYear(nextDate.getFullYear() + interval);
+        break;
+      default:
+        throw new Error(`Unsupported frequency: ${frequency}`);
+    }
+    return nextDate;
+  }
+
+  private async createFirstTransaction(
+    template: RecurringTransactionTemplate,
+    occurrence: RecurringOccurrence,
+  ): Promise<Transaction> {
     const transaction = new Transaction({
       couple_id: template.couple_id,
       type: template.type,
       amount: template.amount,
-      description: this.buildRecurringDescription(template.description, template),
+      description: this.buildRecurringDescription(template.description, occurrence.due_date),
       paid_by_id: template.paid_by_id,
       account_id: template.account_id,
       is_couple_expense: template.is_couple_expense,
       is_free_spending: template.is_free_spending,
       visibility: template.visibility,
       category: template.category,
-      transaction_date: template.start_date,
+      transaction_date: occurrence.due_date,
       installment_group_id: null,
       installment_number: null,
       total_installments: null,
       recurring_template_id: template.id,
     });
-
     return await this.transactionRepository.create(transaction);
   }
 
-  private buildRecurringDescription(
-    baseDescription: string | null,
-    template: RecurringTransactionTemplate,
-  ): string {
-    const frequencyLabel = template.getFrequencyLabel();
-
+  private buildRecurringDescription(baseDescription: string | null, dueDate: Date): string {
+    const monthYear = dueDate.toLocaleDateString('pt-BR', {
+      month: 'long',
+      year: 'numeric',
+    });
     if (!baseDescription) {
-      return `Recorrente (${frequencyLabel})`;
+      return `Recorrente - ${monthYear}`;
     }
-
-    return `${baseDescription} - ${frequencyLabel}`;
+    return `${baseDescription} - ${monthYear}`;
   }
 }

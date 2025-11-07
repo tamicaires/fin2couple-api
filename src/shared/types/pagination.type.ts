@@ -9,6 +9,10 @@ export interface PaginationOutput<T> {
   hasMore: boolean;
 }
 
+export interface InstallmentTemplatePaginationOutput<T> extends PaginationOutput<T> {
+  hasInactiveTemplates: boolean;
+}
+
 export interface PaginationMeta {
   total: number;
   page: number;

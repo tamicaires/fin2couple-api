@@ -4,6 +4,7 @@ import { IInstallmentTemplateRepository } from '@core/domain/repositories/instal
 import { ITransactionRepository } from '@core/domain/repositories/transaction.repository';
 import { Installment } from '@core/domain/entities/installment.entity';
 import { Transaction } from '@core/domain/entities/transaction.entity';
+import { TransactionType } from '@core/enum/transaction-type.enum';
 
 export interface PayInstallmentInput {
   installment_id: string;
@@ -99,7 +100,7 @@ export class PayInstallmentUseCase {
   ): Promise<Transaction> {
     const transaction = new Transaction({
       couple_id: template.couple_id,
-      type: 'EXPENSE', // Installments are always expenses
+      type: TransactionType.EXPENSE, // Installments are always expenses
       amount: installment.amount,
       description: this.buildDescription(
         template.description,

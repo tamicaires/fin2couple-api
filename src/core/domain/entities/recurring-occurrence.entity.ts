@@ -102,7 +102,7 @@ export class RecurringOccurrence {
     const schema = z.object({
       id: z.string().uuid().optional(),
       template_id: z.string().uuid({ message: 'Template ID must be a valid UUID' }),
-      due_date: z.date({ required_error: 'Due date is required' }),
+      due_date: z.date({ message: 'Due date is required' }),
       status: z.nativeEnum(OccurrenceStatus).optional(),
       transaction_id: z.string().uuid().nullable().optional(),
       created_at: z.date().optional(),
@@ -123,6 +123,19 @@ export class RecurringOccurrence {
 
   // To persistence
   toPersistence() {
+    return {
+      id: this.id,
+      template_id: this.template_id,
+      due_date: this.due_date,
+      status: this._status,
+      transaction_id: this._transaction_id,
+      created_at: this.created_at,
+      updated_at: this.updated_at,
+    };
+  }
+
+  // Custom JSON serialization to avoid _status and _transaction_id in output
+  toJSON() {
     return {
       id: this.id,
       template_id: this.template_id,

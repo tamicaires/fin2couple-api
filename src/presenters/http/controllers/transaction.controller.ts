@@ -218,7 +218,6 @@ export class TransactionController {
   ) {
     return this.createInstallmentTransactionUseCase.execute({
       couple_id: coupleId,
-      type: dto.type,
       total_amount: dto.total_amount,
       total_installments: dto.total_installments,
       description: dto.description ?? null,

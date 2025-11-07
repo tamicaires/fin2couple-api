@@ -1,14 +1,15 @@
 import { Injectable, Inject } from '@nestjs/common';
+import { IInstallmentTemplateRepository } from '@core/domain/repositories/installment-template.repository';
+import { IInstallmentRepository } from '@core/domain/repositories/installment.repository';
 import { ITransactionRepository } from '@core/domain/repositories/transaction.repository';
+import { InstallmentTemplate } from '@core/domain/entities/installment-template.entity';
+import { Installment } from '@core/domain/entities/installment.entity';
 import { Transaction } from '@core/domain/entities/transaction.entity';
-import { InstallmentInfo } from '@core/domain/value-objects/installment-info.vo';
 import { TransactionType } from '@core/enum/transaction-type.enum';
 import { TransactionVisibility } from '@core/enum/transaction-visibility.enum';
-import { addMonths } from 'date-fns';
 
 export interface CreateInstallmentTransactionInput {
   couple_id: string;
-  type: TransactionType;
   total_amount: number;
   total_installments: number;
   description: string | null;
@@ -19,28 +20,22 @@ export interface CreateInstallmentTransactionInput {
   visibility: TransactionVisibility;
   category: string | null;
   first_installment_date: Date;
+  pay_first_installment?: boolean;
 }
 
 export interface CreateInstallmentTransactionOutput {
-  installments: Transaction[];
-  installment_group_id: string;
+  template: InstallmentTemplate;
+  installments: Installment[];
+  first_transaction: Transaction | null;
 }
 
-/**
- * Use Case: Create Installment Transaction
- *
- * Creates multiple transactions representing installments of a purchase.
- * Each installment is a separate transaction linked by a group ID.
- *
- * Business Rules:
- * - Total installments must be at least 2
- * - Amount is divided equally among installments
- * - Installments are created monthly starting from first_installment_date
- * - All installments share the same group_id
- */
 @Injectable()
 export class CreateInstallmentTransactionUseCase {
   constructor(
+    @Inject('IInstallmentTemplateRepository')
+    private readonly templateRepository: IInstallmentTemplateRepository,
+    @Inject('IInstallmentRepository')
+    private readonly installmentRepository: IInstallmentRepository,
     @Inject('ITransactionRepository')
     private readonly transactionRepository: ITransactionRepository,
   ) {}
@@ -48,24 +43,24 @@ export class CreateInstallmentTransactionUseCase {
   async execute(input: CreateInstallmentTransactionInput): Promise<CreateInstallmentTransactionOutput> {
     this.validateInput(input);
 
-    // Calculate amount per installment
-    const amountPerInstallment = this.calculateAmountPerInstallment(
-      input.total_amount,
-      input.total_installments,
-    );
+    const template = this.createTemplate(input);
+    const createdTemplate = await this.templateRepository.create(template);
 
-    // Create installment info for the first installment
-    const installmentInfo = InstallmentInfo.createNew(input.total_installments);
+    const installments = this.generateInstallments(createdTemplate);
+    const createdInstallments = await this.installmentRepository.createMany(installments);
 
-    // Generate all installments
-    const installments = this.generateInstallments(input, installmentInfo, amountPerInstallment);
-
-    // Save all installments in batch
-    const createdInstallments = await this.transactionRepository.createBatch(installments);
+    let firstTransaction: Transaction | null = null;
+    if (input.pay_first_installment && createdInstallments.length > 0) {
+      const firstInstallment = createdInstallments[0];
+      firstTransaction = await this.createFirstTransaction(createdTemplate, firstInstallment);
+      firstInstallment.markAsPaid(firstTransaction.id);
+      await this.installmentRepository.markAsPaid(firstInstallment.id, firstTransaction.id);
+    }
 
     return {
+      template: createdTemplate,
       installments: createdInstallments,
-      installment_group_id: installmentInfo.groupId,
+      first_transaction: firstTransaction,
     };
   }
 
@@ -73,83 +68,98 @@ export class CreateInstallmentTransactionUseCase {
     if (input.total_installments < 2) {
       throw new Error('Total installments must be at least 2');
     }
-
+    if (input.total_installments > 120) {
+      throw new Error('Maximum 120 installments allowed');
+    }
     if (input.total_amount <= 0) {
       throw new Error('Total amount must be positive');
     }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const firstDate = new Date(input.first_installment_date);
+    firstDate.setHours(0, 0, 0, 0);
+    if (firstDate < today) {
+      throw new Error('First installment date cannot be in the past');
+    }
   }
 
-  private calculateAmountPerInstallment(totalAmount: number, totalInstallments: number): number {
-    // Divide equally and round to 2 decimal places
-    return Math.round((totalAmount / totalInstallments) * 100) / 100;
+  private createTemplate(input: CreateInstallmentTransactionInput): InstallmentTemplate {
+    return InstallmentTemplate.create({
+      couple_id: input.couple_id,
+      description: input.description ?? undefined,
+      total_amount: input.total_amount,
+      total_installments: input.total_installments,
+      paid_by_id: input.paid_by_id,
+      account_id: input.account_id,
+      category_id: input.category ?? undefined,
+      is_couple_expense: input.is_couple_expense,
+      is_free_spending: input.is_free_spending,
+      visibility: input.visibility,
+      first_due_date: input.first_installment_date,
+    });
   }
 
-  private generateInstallments(
-    input: CreateInstallmentTransactionInput,
-    firstInstallmentInfo: InstallmentInfo,
-    amountPerInstallment: number,
-  ): Transaction[] {
-    const installments: Transaction[] = [];
-    let currentInstallmentInfo: InstallmentInfo | null = firstInstallmentInfo;
-    let currentDate = input.first_installment_date;
+  private generateInstallments(template: InstallmentTemplate): Installment[] {
+    const installmentAmount = template.getInstallmentAmount();
+    const installments: Installment[] = [];
 
-    while (currentInstallmentInfo !== null) {
-      const isLastInstallment = currentInstallmentInfo.isLast();
+    for (let i = 1; i <= template.total_installments; i++) {
+      const dueDate = template.calculateDueDate(i);
+      const amount =
+        i === template.total_installments
+          ? template.total_amount - installmentAmount * (template.total_installments - 1)
+          : installmentAmount;
 
-      // For the last installment, adjust amount to account for rounding differences
-      const amount = isLastInstallment
-        ? this.calculateLastInstallmentAmount(input.total_amount, amountPerInstallment, input.total_installments)
-        : amountPerInstallment;
-
-      const transaction = new Transaction({
-        couple_id: input.couple_id,
-        type: input.type,
-        amount,
-        description: this.buildInstallmentDescription(input.description, currentInstallmentInfo),
-        paid_by_id: input.paid_by_id,
-        account_id: input.account_id,
-        is_couple_expense: input.is_couple_expense,
-        is_free_spending: input.is_free_spending,
-        visibility: input.visibility,
-        category: input.category,
-        transaction_date: currentDate,
-        installment_group_id: currentInstallmentInfo.groupId,
-        installment_number: currentInstallmentInfo.currentNumber,
-        total_installments: currentInstallmentInfo.totalInstallments,
-        recurring_template_id: null,
+      const installment = Installment.create({
+        template_id: template.id,
+        installment_number: i,
+        amount: Math.round(amount * 100) / 100,
+        due_date: dueDate,
       });
 
-      installments.push(transaction);
-
-      // Move to next installment
-      currentInstallmentInfo = currentInstallmentInfo.next();
-      currentDate = addMonths(currentDate, 1);
+      installments.push(installment);
     }
 
     return installments;
   }
 
-  private calculateLastInstallmentAmount(
-    totalAmount: number,
-    amountPerInstallment: number,
-    totalInstallments: number,
-  ): number {
-    // Calculate what was already allocated
-    const allocatedAmount = amountPerInstallment * (totalInstallments - 1);
-    // Last installment gets the remainder to ensure total is exact
-    return totalAmount - allocatedAmount;
+  private async createFirstTransaction(
+    template: InstallmentTemplate,
+    installment: Installment,
+  ): Promise<Transaction> {
+    const transaction = new Transaction({
+      couple_id: template.couple_id,
+      type: 'EXPENSE' as TransactionType,
+      amount: installment.amount,
+      description: this.buildDescription(
+        template.description,
+        installment.installment_number,
+        template.total_installments,
+      ),
+      paid_by_id: template.paid_by_id,
+      account_id: template.account_id,
+      is_couple_expense: template.is_couple_expense,
+      is_free_spending: template.is_free_spending,
+      visibility: template.visibility,
+      category: template.category_id,
+      transaction_date: installment.due_date,
+      installment_group_id: template.id,
+      installment_number: installment.installment_number,
+      total_installments: template.total_installments,
+      recurring_template_id: null,
+    });
+    return await this.transactionRepository.create(transaction);
   }
 
-  private buildInstallmentDescription(
+  private buildDescription(
     baseDescription: string | null,
-    installmentInfo: InstallmentInfo,
+    installmentNumber: number,
+    totalInstallments: number,
   ): string {
-    const installmentLabel = installmentInfo.getLabel();
-
+    const installmentInfo = `${installmentNumber}/${totalInstallments}`;
     if (!baseDescription) {
-      return `Parcela ${installmentLabel}`;
+      return `Parcela ${installmentInfo}`;
     }
-
-    return `${baseDescription} - Parcela ${installmentLabel}`;
+    return `${baseDescription} - Parcela ${installmentInfo}`;
   }
 }
