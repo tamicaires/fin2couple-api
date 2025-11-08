@@ -13,6 +13,7 @@ import { PrismaAccountRepository } from '@infra/database/prisma/repositories/pri
 import { PrismaSubscriptionRepository } from '@infra/database/prisma/repositories/prisma-subscription.repository';
 import { PrismaPlanRepository } from '@infra/database/prisma/repositories/prisma-plan.repository';
 import { PrismaCoupleRepository } from '@infra/database/prisma/repositories/prisma-couple.repository';
+import { PrismaTransactionRepository } from '@infra/database/prisma/repositories/prisma-transaction.repository';
 
 @Module({
   imports: [DatabaseModule, LoggingModule],
@@ -27,6 +28,10 @@ import { PrismaCoupleRepository } from '@infra/database/prisma/repositories/pris
     {
       provide: 'IAccountRepository',
       useClass: PrismaAccountRepository,
+    },
+    {
+      provide: 'ITransactionRepository',
+      useClass: PrismaTransactionRepository,
     },
     {
       provide: 'ISubscriptionRepository',
