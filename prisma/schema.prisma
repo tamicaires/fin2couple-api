@@ -272,6 +272,7 @@ enum AccountType {
 enum TransactionType {
   INCOME
   EXPENSE
+  ADJUSTMENT
 }
 
 enum TransactionVisibility {

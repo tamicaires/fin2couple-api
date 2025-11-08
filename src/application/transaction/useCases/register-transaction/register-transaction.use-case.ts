@@ -8,7 +8,7 @@ import { CoupleNotFoundException } from '@core/exceptions/couple/couple-not-foun
 import { InsufficientFreeSpendingException } from '@core/exceptions/transaction/insufficient-free-spending.exception';
 import { LoggerService } from '@infra/logging/logger.service';
 import { UnitOfWork } from '@infra/database/prisma/unit-of-work';
-import { TransactionType } from '@core/enum/transaction-type.enum';
+import { UserTransactionType, TransactionType } from '@core/enum/transaction-type.enum';
 import { TransactionRegisteredEvent } from '@application/events/domain-events/transaction-registered.event';
 import { TransactionVisibility } from '@prisma/client';
 
@@ -16,7 +16,7 @@ export interface RegisterTransactionInput {
   coupleId: string;
   userId: string;
   account_id: string;
-  type: TransactionType;
+  type: UserTransactionType; // Only INCOME or EXPENSE (excludes ADJUSTMENT)
   amount: number;
   category_id?: string;
   description?: string;
@@ -35,6 +35,7 @@ export interface RegisterTransactionOutput {
   description: string | null;
   transaction_date: Date;
   is_free_spending: boolean;
+  visibility: TransactionVisibility;
   created_at: Date;
 }
 
@@ -107,6 +108,10 @@ export class RegisterTransactionUseCase
       }
     }
 
+    // Determine default visibility based on account type
+    const defaultVisibility = account.owner_id ? 'PRIVATE' : 'SHARED';
+    const visibility = input.visibility ?? defaultVisibility;
+
     // Execute transaction atomically
     const result = await this.unitOfWork.execute(async (prisma) => {
       // Create transaction
@@ -122,7 +127,7 @@ export class RegisterTransactionUseCase
           transaction_date: input.transaction_date || new Date(),
           is_free_spending: input.is_free_spending || false,
           is_couple_expense: false,
-          visibility: input.visibility || 'SHARED', // Default to SHARED
+          visibility,
         },
       });
 
@@ -180,6 +185,7 @@ export class RegisterTransactionUseCase
       description: result.description,
       transaction_date: result.transaction_date,
       is_free_spending: result.is_free_spending,
+      visibility: result.visibility,
       created_at: result.created_at,
     };
   }

@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
+import { CategoryTransactionType } from '@core/enum/transaction-type.enum';
 
 export class Category {
   id: string;
@@ -7,7 +8,7 @@ export class Category {
   name: string;
   icon: string;
   color: string;
-  type: 'INCOME' | 'EXPENSE' | null;
+  type: CategoryTransactionType | null;
   is_default: boolean;
   created_at: Date;
   updated_at: Date;
@@ -24,7 +25,7 @@ export class Category {
     return !this.is_default;
   }
 
-  isApplicableToTransactionType(transactionType: 'INCOME' | 'EXPENSE'): boolean {
+  isApplicableToTransactionType(transactionType: CategoryTransactionType): boolean {
     // null type means applicable to both INCOME and EXPENSE
     return this.type === null || this.type === transactionType;
   }

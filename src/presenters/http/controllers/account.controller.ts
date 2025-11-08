@@ -116,11 +116,13 @@ export class AccountController {
   })
   async deleteAccount(
     @CoupleId() coupleId: string,
+    @UserId() userId: string,
     @Param('id') accountId: string,
   ) {
     return this.deleteAccountUseCase.execute({
       coupleId,
       accountId,
+      userId,
     });
   }
 }

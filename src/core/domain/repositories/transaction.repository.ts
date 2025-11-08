@@ -40,9 +40,13 @@ export interface ITransactionRepository {
   // Business queries
   countByCoupleId(coupleId: string): Promise<number>;
   countByMonth(coupleId: string, year: number, month: number): Promise<number>;
+  countByAccountId(accountId: string): Promise<number>;
 
   // Stats queries
   getMonthlyStats(coupleId: string, year: number, month: number): Promise<MonthlyStats>;
+  getMonthlyStatsVisible(coupleId: string, userId: string, year: number, month: number): Promise<MonthlyStats>;
+  getMonthlyStatsJointAccounts(coupleId: string, year: number, month: number): Promise<MonthlyStats>;
+  getMonthlyStatsPersonalAccounts(coupleId: string, userId: string, year: number, month: number): Promise<MonthlyStats>;
   getTotalByUser(coupleId: string, userId: string, startDate: Date, endDate: Date): Promise<number>;
 
   // Free Spending queries

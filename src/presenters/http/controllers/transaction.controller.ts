@@ -18,7 +18,7 @@ import { CurrentUser } from '@infra/http/auth/decorators/current-user.decorator'
 import { CoupleId } from '@infra/http/auth/decorators/couple-id.decorator';
 import { UserId } from '@infra/http/auth/decorators/user-id.decorator';
 import { AuthenticatedUser } from '@shared/types/authenticated-user.type';
-import { TransactionVisibility } from '@core/enum/transaction-visibility.enum';
+import { UserTransactionType } from '@core/enum/transaction-type.enum';
 
 @ApiTags('Transactions')
 @ApiBearerAuth()
@@ -59,12 +59,13 @@ export class TransactionController {
       coupleId,
       userId: user.id,
       account_id: dto.account_id,
-      type: dto.type,
+      type: dto.type as UserTransactionType, // ADJUSTMENT not allowed for user transactions
       amount: dto.amount,
       category_id: dto.category_id,
       description: dto.description,
       transaction_date: dto.transaction_date,
       is_free_spending: dto.is_free_spending,
+      visibility: dto.visibility,
     });
   }
 
@@ -228,7 +229,7 @@ export class TransactionController {
       account_id: dto.account_id,
       is_couple_expense: dto.is_couple_expense ?? false,
       is_free_spending: dto.is_free_spending ?? false,
-      visibility: dto.visibility ?? TransactionVisibility.SHARED,
+      visibility: dto.visibility,
       category: dto.category_id ?? null,
       first_installment_date: dto.first_installment_date ?? new Date(),
     });
@@ -259,7 +260,7 @@ export class TransactionController {
       account_id: dto.account_id,
       is_couple_expense: dto.is_couple_expense ?? false,
       is_free_spending: dto.is_free_spending ?? false,
-      visibility: dto.visibility ?? TransactionVisibility.SHARED,
+      visibility: dto.visibility,
       category: dto.category_id ?? null,
       frequency: dto.frequency,
       interval: dto.interval ?? 1,
