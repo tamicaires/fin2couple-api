@@ -204,6 +204,17 @@ export class PrismaTransactionRepository implements ITransactionRepository {
     });
   }
 
+  async countByAccountId(accountId: string): Promise<number> {
+    const coupleId = this.tenant.getCoupleId();
+
+    return await this.prisma.transaction.count({
+      where: {
+        account_id: accountId,
+        couple_id: coupleId,
+      },
+    });
+  }
+
   async getMonthlyStats(coupleId: string, year: number, month: number): Promise<MonthlyStats> {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
