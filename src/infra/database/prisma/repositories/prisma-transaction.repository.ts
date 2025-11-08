@@ -264,6 +264,72 @@ export class PrismaTransactionRepository implements ITransactionRepository {
     };
   }
 
+  async getMonthlyStatsVisible(
+    coupleId: string,
+    userId: string,
+    year: number,
+    month: number,
+  ): Promise<MonthlyStats> {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    // Base filter: only transactions from accessible accounts (joint + user's personal)
+    const accountFilter = {
+      OR: [
+        { owner_id: null },      // Joint accounts
+        { owner_id: userId },    // User's personal accounts
+      ],
+    };
+
+    const [incomeResult, expenseResult, coupleExpenseResult, individualExpenseResult] = await Promise.all([
+      this.prisma.transaction.aggregate({
+        where: {
+          couple_id: coupleId,
+          type: TransactionType.INCOME,
+          transaction_date: { gte: startDate, lte: endDate },
+          account: accountFilter,
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          couple_id: coupleId,
+          type: TransactionType.EXPENSE,
+          transaction_date: { gte: startDate, lte: endDate },
+          account: accountFilter,
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          couple_id: coupleId,
+          type: TransactionType.EXPENSE,
+          is_couple_expense: true,
+          transaction_date: { gte: startDate, lte: endDate },
+          account: accountFilter,
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          couple_id: coupleId,
+          type: TransactionType.EXPENSE,
+          is_couple_expense: false,
+          transaction_date: { gte: startDate, lte: endDate },
+          account: accountFilter,
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    return {
+      totalIncome: Number(incomeResult._sum.amount) || 0,
+      totalExpenses: Number(expenseResult._sum.amount) || 0,
+      coupleExpenses: Number(coupleExpenseResult._sum.amount) || 0,
+      individualExpenses: Number(individualExpenseResult._sum.amount) || 0,
+    };
+  }
+
   async getTotalByUser(
     coupleId: string,
     userId: string,

@@ -18,6 +18,7 @@ export interface IAccountRepository {
   // Business queries
   countByCoupleId(coupleId: string): Promise<number>;
   getTotalBalance(coupleId: string): Promise<number>;
+  getTotalBalanceVisible(coupleId: string, userId: string): Promise<number>;
 
   // Balance operations
   updateBalance(id: string, newBalance: number): Promise<void>;

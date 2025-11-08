@@ -44,6 +44,7 @@ export interface ITransactionRepository {
 
   // Stats queries
   getMonthlyStats(coupleId: string, year: number, month: number): Promise<MonthlyStats>;
+  getMonthlyStatsVisible(coupleId: string, userId: string, year: number, month: number): Promise<MonthlyStats>;
   getTotalByUser(coupleId: string, userId: string, startDate: Date, endDate: Date): Promise<number>;
 
   // Free Spending queries

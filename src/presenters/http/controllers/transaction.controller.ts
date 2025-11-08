@@ -18,7 +18,6 @@ import { CurrentUser } from '@infra/http/auth/decorators/current-user.decorator'
 import { CoupleId } from '@infra/http/auth/decorators/couple-id.decorator';
 import { UserId } from '@infra/http/auth/decorators/user-id.decorator';
 import { AuthenticatedUser } from '@shared/types/authenticated-user.type';
-import { TransactionVisibility } from '@core/enum/transaction-visibility.enum';
 import { UserTransactionType } from '@core/enum/transaction-type.enum';
 
 @ApiTags('Transactions')

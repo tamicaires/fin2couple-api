@@ -52,7 +52,7 @@ export class CreateInstallmentTransactionUseCase {
       throw new AccountNotFoundException(input.account_id);
     }
 
-    const visibility = input.visibility ?? (account.owner_id ? 'PRIVATE' : 'SHARED');
+    const visibility: TransactionVisibility = input.visibility ?? (account.owner_id ? TransactionVisibility.PRIVATE : TransactionVisibility.SHARED);
     const template = this.createTemplate(input, visibility);
     const createdTemplate = await this.templateRepository.create(template);
 

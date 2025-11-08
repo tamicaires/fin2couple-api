@@ -90,10 +90,10 @@ export class GetCoupleDashboardUseCase
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
 
-    // Parallel queries for performance
+    // Parallel queries for performance (only visible accounts/transactions)
     const [totalBalance, monthlyStats] = await Promise.all([
-      this.accountRepository.getTotalBalance(input.coupleId),
-      this.transactionRepository.getMonthlyStats(input.coupleId, year, month),
+      this.accountRepository.getTotalBalanceVisible(input.coupleId, input.userId),
+      this.transactionRepository.getMonthlyStatsVisible(input.coupleId, input.userId, year, month),
     ]);
 
     // Calculate free spending stats
