@@ -66,6 +66,7 @@ export class TransactionController {
       description: dto.description,
       transaction_date: dto.transaction_date,
       is_free_spending: dto.is_free_spending,
+      visibility: dto.visibility,
     });
   }
 

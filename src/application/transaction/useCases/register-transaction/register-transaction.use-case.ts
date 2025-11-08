@@ -35,6 +35,7 @@ export interface RegisterTransactionOutput {
   description: string | null;
   transaction_date: Date;
   is_free_spending: boolean;
+  visibility: TransactionVisibility;
   created_at: Date;
 }
 
@@ -180,6 +181,7 @@ export class RegisterTransactionUseCase
       description: result.description,
       transaction_date: result.transaction_date,
       is_free_spending: result.is_free_spending,
+      visibility: result.visibility,
       created_at: result.created_at,
     };
   }
