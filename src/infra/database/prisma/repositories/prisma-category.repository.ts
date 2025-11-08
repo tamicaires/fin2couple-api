@@ -2,10 +2,24 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { ICategoryRepository } from '@core/domain/repositories/category.repository';
 import { Category } from '@core/domain/entities/category.entity';
+import { CategoryTransactionType } from '@core/enum/transaction-type.enum';
+import { Category as PrismaCategory } from '@prisma/client';
 
 @Injectable()
 export class PrismaCategoryRepository implements ICategoryRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Maps Prisma category to domain category
+   * Casts type to CategoryTransactionType (INCOME | EXPENSE only)
+   * @private
+   */
+  private toDomain(prismaCategory: PrismaCategory): Category {
+    return new Category({
+      ...prismaCategory,
+      type: prismaCategory.type as CategoryTransactionType | null,
+    });
+  }
 
   async create(category: Category): Promise<Category> {
     const data = await this.prisma.category.create({
@@ -22,7 +36,7 @@ export class PrismaCategoryRepository implements ICategoryRepository {
       },
     });
 
-    return new Category(data);
+    return this.toDomain(data);
   }
 
   async findById(id: string): Promise<Category | null> {
@@ -30,7 +44,7 @@ export class PrismaCategoryRepository implements ICategoryRepository {
       where: { id },
     });
 
-    return data ? new Category(data) : null;
+    return data ? this.toDomain(data) : null;
   }
 
   async findAll(coupleId: string): Promise<Category[]> {
@@ -42,7 +56,7 @@ export class PrismaCategoryRepository implements ICategoryRepository {
       ],
     });
 
-    return data.map((item) => new Category(item));
+    return data.map((item) => this.toDomain(item));
   }
 
   async findByCoupleAndType(
@@ -63,7 +77,7 @@ export class PrismaCategoryRepository implements ICategoryRepository {
       ],
     });
 
-    return data.map((item) => new Category(item));
+    return data.map((item) => this.toDomain(item));
   }
 
   async update(category: Category): Promise<Category> {
@@ -78,7 +92,7 @@ export class PrismaCategoryRepository implements ICategoryRepository {
       },
     });
 
-    return new Category(data);
+    return this.toDomain(data);
   }
 
   async delete(id: string): Promise<void> {

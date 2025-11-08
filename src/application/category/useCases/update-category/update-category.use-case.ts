@@ -2,6 +2,7 @@ import { Injectable, Inject, NotFoundException } from '@nestjs/common';
 import { IUseCase } from '@shared/protocols/use-case.interface';
 import { ICategoryRepository } from '@core/domain/repositories/category.repository';
 import { LoggerService } from '@infra/logging/logger.service';
+import { CategoryTransactionType } from '@core/enum/transaction-type.enum';
 
 export interface UpdateCategoryInput {
   categoryId: string;
@@ -9,7 +10,7 @@ export interface UpdateCategoryInput {
   name?: string;
   icon?: string;
   color?: string;
-  type?: 'INCOME' | 'EXPENSE' | null;
+  type?: CategoryTransactionType | null;
 }
 
 export interface UpdateCategoryOutput {
@@ -17,7 +18,7 @@ export interface UpdateCategoryOutput {
   name: string;
   icon: string;
   color: string;
-  type: 'INCOME' | 'EXPENSE' | null;
+  type: CategoryTransactionType | null;
   updated_at: Date;
 }
 
