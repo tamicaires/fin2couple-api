@@ -20,6 +20,7 @@ import { CreateCategoryUseCase } from '@application/category/useCases/create-cat
 import { ListCategoriesUseCase } from '@application/category/useCases/list-categories/list-categories.use-case';
 import { UpdateCategoryUseCase } from '@application/category/useCases/update-category/update-category.use-case';
 import { DeleteCategoryUseCase } from '@application/category/useCases/delete-category/delete-category.use-case';
+import { CategoryTransactionType } from '@core/enum/transaction-type.enum';
 
 @ApiTags('Categories')
 @Controller('categories')
@@ -94,7 +95,10 @@ export class CategoryController {
     return this.updateCategoryUseCase.execute({
       categoryId,
       coupleId,
-      ...dto,
+      name: dto.name,
+      icon: dto.icon,
+      color: dto.color,
+      type: dto.type as CategoryTransactionType | null,
     });
   }
 

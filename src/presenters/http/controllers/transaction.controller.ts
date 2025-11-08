@@ -19,6 +19,7 @@ import { CoupleId } from '@infra/http/auth/decorators/couple-id.decorator';
 import { UserId } from '@infra/http/auth/decorators/user-id.decorator';
 import { AuthenticatedUser } from '@shared/types/authenticated-user.type';
 import { TransactionVisibility } from '@core/enum/transaction-visibility.enum';
+import { UserTransactionType } from '@core/enum/transaction-type.enum';
 
 @ApiTags('Transactions')
 @ApiBearerAuth()
@@ -59,7 +60,7 @@ export class TransactionController {
       coupleId,
       userId: user.id,
       account_id: dto.account_id,
-      type: dto.type,
+      type: dto.type as UserTransactionType, // ADJUSTMENT not allowed for user transactions
       amount: dto.amount,
       category_id: dto.category_id,
       description: dto.description,
