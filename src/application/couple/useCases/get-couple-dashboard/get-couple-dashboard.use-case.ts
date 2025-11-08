@@ -21,11 +21,21 @@ export interface GetCoupleDashboardOutput {
     allow_private_transactions: boolean;
   };
 
-  // Financial overview
-  total_balance: number;
-  monthly_income: number;
-  monthly_expenses: number;
-  couple_expenses: number;
+  // Joint accounts finances
+  couple_finances: {
+    balance: number;
+    monthly_income: number;
+    monthly_expenses: number;
+    couple_expenses: number;
+  };
+
+  // Personal accounts finances (user's private accounts)
+  my_personal_finances: {
+    balance: number;
+    monthly_income: number;
+    monthly_expenses: number;
+    couple_expenses: number;
+  };
 
   // Free Spending (Individual)
   free_spending: {
@@ -90,10 +100,12 @@ export class GetCoupleDashboardUseCase
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
 
-    // Parallel queries for performance (only visible accounts/transactions)
-    const [totalBalance, monthlyStats] = await Promise.all([
-      this.accountRepository.getTotalBalanceVisible(input.coupleId, input.userId),
-      this.transactionRepository.getMonthlyStatsVisible(input.coupleId, input.userId, year, month),
+    // Parallel queries for performance - separate couple vs personal finances
+    const [jointBalance, personalBalance, jointStats, personalStats] = await Promise.all([
+      this.accountRepository.getJointAccountsBalance(input.coupleId),
+      this.accountRepository.getPersonalAccountsBalance(input.coupleId, input.userId),
+      this.transactionRepository.getMonthlyStatsJointAccounts(input.coupleId, year, month),
+      this.transactionRepository.getMonthlyStatsPersonalAccounts(input.coupleId, input.userId, year, month),
     ]);
 
     // Calculate free spending stats
@@ -129,10 +141,18 @@ export class GetCoupleDashboardUseCase
         allow_personal_accounts: couple.allow_personal_accounts,
         allow_private_transactions: couple.allow_private_transactions,
       },
-      total_balance: totalBalance,
-      monthly_income: monthlyStats.totalIncome,
-      monthly_expenses: monthlyStats.totalExpenses,
-      couple_expenses: monthlyStats.coupleExpenses,
+      couple_finances: {
+        balance: jointBalance,
+        monthly_income: jointStats.totalIncome,
+        monthly_expenses: jointStats.totalExpenses,
+        couple_expenses: jointStats.coupleExpenses,
+      },
+      my_personal_finances: {
+        balance: personalBalance,
+        monthly_income: personalStats.totalIncome,
+        monthly_expenses: personalStats.totalExpenses,
+        couple_expenses: personalStats.coupleExpenses,
+      },
       free_spending: {
         user_a: freeSpendingA,
         user_b: freeSpendingB,

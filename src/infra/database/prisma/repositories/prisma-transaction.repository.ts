@@ -330,6 +330,117 @@ export class PrismaTransactionRepository implements ITransactionRepository {
     };
   }
 
+  async getMonthlyStatsJointAccounts(coupleId: string, year: number, month: number): Promise<MonthlyStats> {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    const [incomeResult, expenseResult, coupleExpenseResult, individualExpenseResult] = await Promise.all([
+      this.prisma.transaction.aggregate({
+        where: {
+          couple_id: coupleId,
+          type: TransactionType.INCOME,
+          transaction_date: { gte: startDate, lte: endDate },
+          account: { owner_id: null },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          couple_id: coupleId,
+          type: TransactionType.EXPENSE,
+          transaction_date: { gte: startDate, lte: endDate },
+          account: { owner_id: null },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          couple_id: coupleId,
+          type: TransactionType.EXPENSE,
+          is_couple_expense: true,
+          transaction_date: { gte: startDate, lte: endDate },
+          account: { owner_id: null },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          couple_id: coupleId,
+          type: TransactionType.EXPENSE,
+          is_couple_expense: false,
+          transaction_date: { gte: startDate, lte: endDate },
+          account: { owner_id: null },
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    return {
+      totalIncome: Number(incomeResult._sum.amount) || 0,
+      totalExpenses: Number(expenseResult._sum.amount) || 0,
+      coupleExpenses: Number(coupleExpenseResult._sum.amount) || 0,
+      individualExpenses: Number(individualExpenseResult._sum.amount) || 0,
+    };
+  }
+
+  async getMonthlyStatsPersonalAccounts(
+    coupleId: string,
+    userId: string,
+    year: number,
+    month: number,
+  ): Promise<MonthlyStats> {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+
+    const [incomeResult, expenseResult, coupleExpenseResult, individualExpenseResult] = await Promise.all([
+      this.prisma.transaction.aggregate({
+        where: {
+          couple_id: coupleId,
+          type: TransactionType.INCOME,
+          transaction_date: { gte: startDate, lte: endDate },
+          account: { owner_id: userId },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          couple_id: coupleId,
+          type: TransactionType.EXPENSE,
+          transaction_date: { gte: startDate, lte: endDate },
+          account: { owner_id: userId },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          couple_id: coupleId,
+          type: TransactionType.EXPENSE,
+          is_couple_expense: true,
+          transaction_date: { gte: startDate, lte: endDate },
+          account: { owner_id: userId },
+        },
+        _sum: { amount: true },
+      }),
+      this.prisma.transaction.aggregate({
+        where: {
+          couple_id: coupleId,
+          type: TransactionType.EXPENSE,
+          is_couple_expense: false,
+          transaction_date: { gte: startDate, lte: endDate },
+          account: { owner_id: userId },
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    return {
+      totalIncome: Number(incomeResult._sum.amount) || 0,
+      totalExpenses: Number(expenseResult._sum.amount) || 0,
+      coupleExpenses: Number(coupleExpenseResult._sum.amount) || 0,
+      individualExpenses: Number(individualExpenseResult._sum.amount) || 0,
+    };
+  }
+
   async getTotalByUser(
     coupleId: string,
     userId: string,

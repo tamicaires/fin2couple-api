@@ -147,6 +147,34 @@ export class PrismaAccountRepository implements IAccountRepository {
     return Number(result._sum.current_balance) || 0;
   }
 
+  async getJointAccountsBalance(coupleId: string): Promise<number> {
+    const result = await this.prisma.account.aggregate({
+      where: {
+        couple_id: coupleId,
+        owner_id: null,
+      },
+      _sum: {
+        current_balance: true,
+      },
+    });
+
+    return Number(result._sum.current_balance) || 0;
+  }
+
+  async getPersonalAccountsBalance(coupleId: string, userId: string): Promise<number> {
+    const result = await this.prisma.account.aggregate({
+      where: {
+        couple_id: coupleId,
+        owner_id: userId,
+      },
+      _sum: {
+        current_balance: true,
+      },
+    });
+
+    return Number(result._sum.current_balance) || 0;
+  }
+
   async updateBalance(id: string, newBalance: number): Promise<void> {
     const coupleId = this.tenant.getCoupleId();
 
