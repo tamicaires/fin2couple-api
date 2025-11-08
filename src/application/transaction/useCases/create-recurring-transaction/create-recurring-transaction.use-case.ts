@@ -2,6 +2,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import { IRecurringTransactionTemplateRepository } from '@core/domain/repositories/recurring-transaction-template.repository';
 import { IRecurringOccurrenceRepository } from '@core/domain/repositories/recurring-occurrence.repository';
 import { ITransactionRepository } from '@core/domain/repositories/transaction.repository';
+import { IAccountRepository } from '@core/domain/repositories/account.repository';
 import { RecurringTransactionTemplate } from '@core/domain/entities/recurring-transaction-template.entity';
 import { RecurringOccurrence } from '@core/domain/entities/recurring-occurrence.entity';
 import { Transaction } from '@core/domain/entities/transaction.entity';
@@ -9,6 +10,7 @@ import { TransactionType } from '@core/enum/transaction-type.enum';
 import { TransactionVisibility } from '@core/enum/transaction-visibility.enum';
 import { RecurrenceFrequency } from '@core/enum/recurrence-frequency.enum';
 import { RecurrenceConfig } from '@core/domain/value-objects/recurrence-config.vo';
+import { AccountNotFoundException } from '@core/exceptions/account/account-not-found.exception';
 
 export interface CreateRecurringTransactionInput {
   couple_id: string;
@@ -19,7 +21,7 @@ export interface CreateRecurringTransactionInput {
   account_id: string;
   is_couple_expense: boolean;
   is_free_spending: boolean;
-  visibility: TransactionVisibility;
+  visibility?: TransactionVisibility;
   category: string | null;
 
   // Recurrence configuration
@@ -46,10 +48,19 @@ export class CreateRecurringTransactionUseCase {
     private readonly occurrenceRepository: IRecurringOccurrenceRepository,
     @Inject('ITransactionRepository')
     private readonly transactionRepository: ITransactionRepository,
+    @Inject('IAccountRepository')
+    private readonly accountRepository: IAccountRepository,
   ) {}
 
   async execute(input: CreateRecurringTransactionInput): Promise<CreateRecurringTransactionOutput> {
     this.validateInput(input);
+
+    const account = await this.accountRepository.findById(input.account_id);
+    if (!account) {
+      throw new AccountNotFoundException(input.account_id);
+    }
+
+    const visibility = input.visibility ?? (account.owner_id ? 'PRIVATE' : 'SHARED');
 
     const recurrenceConfig = RecurrenceConfig.create(
       input.frequency,
@@ -58,7 +69,7 @@ export class CreateRecurringTransactionUseCase {
       input.end_date,
     );
 
-    const template = this.createTemplate(input, recurrenceConfig);
+    const template = this.createTemplate(input, recurrenceConfig, visibility);
     const createdTemplate = await this.templateRepository.create(template);
 
     const monthsAhead = input.months_ahead || 3;
@@ -94,6 +105,7 @@ export class CreateRecurringTransactionUseCase {
   private createTemplate(
     input: CreateRecurringTransactionInput,
     recurrenceConfig: RecurrenceConfig,
+    visibility: TransactionVisibility,
   ): RecurringTransactionTemplate {
     return new RecurringTransactionTemplate({
       couple_id: input.couple_id,
@@ -104,7 +116,7 @@ export class CreateRecurringTransactionUseCase {
       account_id: input.account_id,
       is_couple_expense: input.is_couple_expense,
       is_free_spending: input.is_free_spending,
-      visibility: input.visibility,
+      visibility,
       category: input.category,
       frequency: recurrenceConfig.frequency,
       interval: recurrenceConfig.interval,

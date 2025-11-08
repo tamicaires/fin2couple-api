@@ -2,11 +2,13 @@ import { Injectable, Inject } from '@nestjs/common';
 import { IInstallmentTemplateRepository } from '@core/domain/repositories/installment-template.repository';
 import { IInstallmentRepository } from '@core/domain/repositories/installment.repository';
 import { ITransactionRepository } from '@core/domain/repositories/transaction.repository';
+import { IAccountRepository } from '@core/domain/repositories/account.repository';
 import { InstallmentTemplate } from '@core/domain/entities/installment-template.entity';
 import { Installment } from '@core/domain/entities/installment.entity';
 import { Transaction } from '@core/domain/entities/transaction.entity';
 import { TransactionType } from '@core/enum/transaction-type.enum';
 import { TransactionVisibility } from '@core/enum/transaction-visibility.enum';
+import { AccountNotFoundException } from '@core/exceptions/account/account-not-found.exception';
 
 export interface CreateInstallmentTransactionInput {
   couple_id: string;
@@ -17,7 +19,7 @@ export interface CreateInstallmentTransactionInput {
   account_id: string;
   is_couple_expense: boolean;
   is_free_spending: boolean;
-  visibility: TransactionVisibility;
+  visibility?: TransactionVisibility;
   category: string | null;
   first_installment_date: Date;
   pay_first_installment?: boolean;
@@ -38,12 +40,20 @@ export class CreateInstallmentTransactionUseCase {
     private readonly installmentRepository: IInstallmentRepository,
     @Inject('ITransactionRepository')
     private readonly transactionRepository: ITransactionRepository,
+    @Inject('IAccountRepository')
+    private readonly accountRepository: IAccountRepository,
   ) {}
 
   async execute(input: CreateInstallmentTransactionInput): Promise<CreateInstallmentTransactionOutput> {
     this.validateInput(input);
 
-    const template = this.createTemplate(input);
+    const account = await this.accountRepository.findById(input.account_id);
+    if (!account) {
+      throw new AccountNotFoundException(input.account_id);
+    }
+
+    const visibility = input.visibility ?? (account.owner_id ? 'PRIVATE' : 'SHARED');
+    const template = this.createTemplate(input, visibility);
     const createdTemplate = await this.templateRepository.create(template);
 
     const installments = this.generateInstallments(createdTemplate);
@@ -83,7 +93,10 @@ export class CreateInstallmentTransactionUseCase {
     }
   }
 
-  private createTemplate(input: CreateInstallmentTransactionInput): InstallmentTemplate {
+  private createTemplate(
+    input: CreateInstallmentTransactionInput,
+    visibility: TransactionVisibility,
+  ): InstallmentTemplate {
     return InstallmentTemplate.create({
       couple_id: input.couple_id,
       description: input.description ?? undefined,
@@ -94,7 +107,7 @@ export class CreateInstallmentTransactionUseCase {
       category_id: input.category ?? undefined,
       is_couple_expense: input.is_couple_expense,
       is_free_spending: input.is_free_spending,
-      visibility: input.visibility,
+      visibility,
       first_due_date: input.first_installment_date,
     });
   }

@@ -230,7 +230,7 @@ export class TransactionController {
       account_id: dto.account_id,
       is_couple_expense: dto.is_couple_expense ?? false,
       is_free_spending: dto.is_free_spending ?? false,
-      visibility: dto.visibility ?? TransactionVisibility.SHARED,
+      visibility: dto.visibility,
       category: dto.category_id ?? null,
       first_installment_date: dto.first_installment_date ?? new Date(),
     });
@@ -261,7 +261,7 @@ export class TransactionController {
       account_id: dto.account_id,
       is_couple_expense: dto.is_couple_expense ?? false,
       is_free_spending: dto.is_free_spending ?? false,
-      visibility: dto.visibility ?? TransactionVisibility.SHARED,
+      visibility: dto.visibility,
       category: dto.category_id ?? null,
       frequency: dto.frequency,
       interval: dto.interval ?? 1,

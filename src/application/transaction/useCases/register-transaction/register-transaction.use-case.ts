@@ -108,6 +108,10 @@ export class RegisterTransactionUseCase
       }
     }
 
+    // Determine default visibility based on account type
+    const defaultVisibility = account.owner_id ? 'PRIVATE' : 'SHARED';
+    const visibility = input.visibility ?? defaultVisibility;
+
     // Execute transaction atomically
     const result = await this.unitOfWork.execute(async (prisma) => {
       // Create transaction
@@ -123,7 +127,7 @@ export class RegisterTransactionUseCase
           transaction_date: input.transaction_date || new Date(),
           is_free_spending: input.is_free_spending || false,
           is_couple_expense: false,
-          visibility: input.visibility || 'SHARED', // Default to SHARED
+          visibility,
         },
       });
 
