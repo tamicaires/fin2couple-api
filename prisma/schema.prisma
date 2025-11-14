@@ -156,11 +156,13 @@ model Account {
   current_balance Decimal       @default(0) @db.Decimal(10, 2)
   created_at      DateTime      @default(now())
   updated_at      DateTime      @updatedAt
+  archived_at     DateTime?
   couple          Couple        @relation(fields: [couple_id], references: [id], onDelete: Cascade)
   transactions    Transaction[]
   installment_templates InstallmentTemplate[]
 
   @@index([couple_id])
+  @@index([archived_at])
   @@map("accounts")
 }
 
@@ -200,7 +202,7 @@ model Transaction {
   installment_number    Int?
   recurring_template_id String?
   total_installments    Int?
-  account               Account                       @relation(fields: [account_id], references: [id])
+  account               Account                       @relation(fields: [account_id], references: [id], onDelete: Cascade)
   category              Category?                     @relation(fields: [category_id], references: [id])
   couple                Couple                        @relation(fields: [couple_id], references: [id], onDelete: Cascade)
   paid_by               User                          @relation("PaidBy", fields: [paid_by_id], references: [id])
@@ -342,7 +344,7 @@ model InstallmentTemplate {
 
   couple              Couple                  @relation(fields: [couple_id], references: [id], onDelete: Cascade)
   paid_by             User                    @relation(fields: [paid_by_id], references: [id])
-  account             Account                 @relation(fields: [account_id], references: [id])
+  account             Account                 @relation(fields: [account_id], references: [id], onDelete: Cascade)
   category            Category?               @relation(fields: [category_id], references: [id])
   installments        Installment[]
 
