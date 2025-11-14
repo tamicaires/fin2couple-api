@@ -24,6 +24,7 @@ export class PrismaAccountRepository implements IAccountRepository {
       where: {
         id,
         couple_id: coupleId, // Tenant isolation
+        archived_at: null, // Exclude archived
       },
     });
 
@@ -32,7 +33,10 @@ export class PrismaAccountRepository implements IAccountRepository {
 
   async findByCoupleId(coupleId: string): Promise<Account[]> {
     const accounts = await this.prisma.account.findMany({
-      where: { couple_id: coupleId },
+      where: {
+        couple_id: coupleId,
+        archived_at: null, // Exclude archived
+      },
       orderBy: { created_at: 'desc' },
     });
 
@@ -46,6 +50,7 @@ export class PrismaAccountRepository implements IAccountRepository {
       where: {
         couple_id: coupleId,
         owner_id: ownerId,
+        archived_at: null, // Exclude archived
       },
       orderBy: { created_at: 'desc' },
     });
@@ -58,6 +63,7 @@ export class PrismaAccountRepository implements IAccountRepository {
       where: {
         couple_id: coupleId,
         owner_id: null, // Joint accounts have no owner
+        archived_at: null, // Exclude archived
       },
       orderBy: { created_at: 'desc' },
     });
@@ -69,6 +75,7 @@ export class PrismaAccountRepository implements IAccountRepository {
     const accounts = await this.prisma.account.findMany({
       where: {
         couple_id: coupleId,
+        archived_at: null, // Exclude archived
         OR: [
           { owner_id: null }, // Joint accounts
           { owner_id: userId }, // User's personal accounts
@@ -113,15 +120,35 @@ export class PrismaAccountRepository implements IAccountRepository {
     });
   }
 
+  async archive(id: string): Promise<void> {
+    const coupleId = this.tenant.getCoupleId();
+
+    await this.prisma.account.update({
+      where: {
+        id,
+        couple_id: coupleId,
+      },
+      data: {
+        archived_at: new Date(),
+      },
+    });
+  }
+
   async countByCoupleId(coupleId: string): Promise<number> {
     return await this.prisma.account.count({
-      where: { couple_id: coupleId },
+      where: {
+        couple_id: coupleId,
+        archived_at: null, // Exclude archived
+      },
     });
   }
 
   async getTotalBalance(coupleId: string): Promise<number> {
     const result = await this.prisma.account.aggregate({
-      where: { couple_id: coupleId },
+      where: {
+        couple_id: coupleId,
+        archived_at: null, // Exclude archived
+      },
       _sum: {
         current_balance: true,
       },
@@ -134,6 +161,7 @@ export class PrismaAccountRepository implements IAccountRepository {
     const result = await this.prisma.account.aggregate({
       where: {
         couple_id: coupleId,
+        archived_at: null, // Exclude archived
         OR: [
           { owner_id: null },      // Joint accounts
           { owner_id: userId },    // User's personal accounts
@@ -152,6 +180,7 @@ export class PrismaAccountRepository implements IAccountRepository {
       where: {
         couple_id: coupleId,
         owner_id: null,
+        archived_at: null, // Exclude archived
       },
       _sum: {
         current_balance: true,
@@ -166,6 +195,7 @@ export class PrismaAccountRepository implements IAccountRepository {
       where: {
         couple_id: coupleId,
         owner_id: userId,
+        archived_at: null, // Exclude archived
       },
       _sum: {
         current_balance: true,

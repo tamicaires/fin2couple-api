@@ -30,6 +30,7 @@ export class PrismaAccountMapper {
       name: account.name,
       type: account.type as PrismaAccountType,
       current_balance: new Prisma.Decimal(account.current_balance),
+      archived_at: null,
     };
   }
 }

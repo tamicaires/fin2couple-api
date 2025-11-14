@@ -14,6 +14,7 @@ export interface IAccountRepository {
   create(account: Account): Promise<Account>;
   update(id: string, data: Partial<Account>): Promise<Account>;
   delete(id: string): Promise<void>;
+  archive(id: string): Promise<void>;
 
   // Business queries
   countByCoupleId(coupleId: string): Promise<number>;

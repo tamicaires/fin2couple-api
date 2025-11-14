@@ -7,6 +7,7 @@ import { CreateAccountUseCase } from './useCases/create-account/create-account.u
 import { ListAccountsUseCase } from './useCases/list-accounts/list-accounts.use-case';
 import { UpdateAccountUseCase } from './useCases/update-account/update-account.use-case';
 import { DeleteAccountUseCase } from './useCases/delete-account/delete-account.use-case';
+import { ArchiveAccountUseCase } from './useCases/archive-account/archive-account.use-case';
 
 // Repositories
 import { PrismaAccountRepository } from '@infra/database/prisma/repositories/prisma-account.repository';
@@ -23,6 +24,7 @@ import { PrismaTransactionRepository } from '@infra/database/prisma/repositories
     ListAccountsUseCase,
     UpdateAccountUseCase,
     DeleteAccountUseCase,
+    ArchiveAccountUseCase,
 
     // Repositories
     {
@@ -51,6 +53,7 @@ import { PrismaTransactionRepository } from '@infra/database/prisma/repositories
     ListAccountsUseCase,
     UpdateAccountUseCase,
     DeleteAccountUseCase,
+    ArchiveAccountUseCase,
   ],
 })
 export class AccountModule {}

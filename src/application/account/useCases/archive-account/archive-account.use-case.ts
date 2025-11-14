@@ -4,39 +4,39 @@ import { IAccountRepository } from '@core/domain/repositories/account.repository
 import { AccountNotFoundException } from '@core/exceptions/account/account-not-found.exception';
 import { LoggerService } from '@infra/logging/logger.service';
 
-export interface DeleteAccountInput {
+export interface ArchiveAccountInput {
   coupleId: string;
   accountId: string;
   userId: string;
 }
 
-export interface DeleteAccountOutput {
+export interface ArchiveAccountOutput {
   success: boolean;
-  deleted_account_id: string;
+  archived_account_id: string;
 }
 
 /**
- * Delete Account Use Case (Hard Delete)
+ * Archive Account Use Case
  *
- * Permanently deletes an account and all its transactions
+ * Archives an account (soft delete)
  *
  * Business Rules:
  * - Account must exist and belong to the couple
- * - Deletes account permanently from database
- * - CASCADE deletes all transactions and installment templates
- * - This action is IRREVERSIBLE
- * - Should require user confirmation
+ * - Sets archived_at timestamp
+ * - Account becomes hidden from listings
+ * - All transactions preserved
+ * - Can be restored later
  */
 @Injectable()
-export class DeleteAccountUseCase implements IUseCase<DeleteAccountInput, DeleteAccountOutput> {
+export class ArchiveAccountUseCase implements IUseCase<ArchiveAccountInput, ArchiveAccountOutput> {
   constructor(
     @Inject('IAccountRepository')
     private readonly accountRepository: IAccountRepository,
     private readonly logger: LoggerService,
   ) {}
 
-  async execute(input: DeleteAccountInput): Promise<DeleteAccountOutput> {
-    this.logger.logUseCase('DeleteAccountUseCase (Hard Delete)', {
+  async execute(input: ArchiveAccountInput): Promise<ArchiveAccountOutput> {
+    this.logger.logUseCase('ArchiveAccountUseCase', {
       coupleId: input.coupleId,
       accountId: input.accountId,
       userId: input.userId,
@@ -47,25 +47,23 @@ export class DeleteAccountUseCase implements IUseCase<DeleteAccountInput, Delete
 
     this.validateAccountExists(account, input.accountId);
 
-    // Permanently delete account (CASCADE will delete transactions)
-    await this.accountRepository.delete(input.accountId);
+    // Archive account
+    await this.accountRepository.archive(input.accountId);
 
-    this.logger.warn('Account permanently deleted', {
+    this.logger.log('Account archived successfully', {
       accountId: input.accountId,
       coupleId: input.coupleId,
       balance: account.balance,
-      message: 'All transactions were also deleted',
     });
 
     return {
       success: true,
-      deleted_account_id: input.accountId,
+      archived_account_id: input.accountId,
     };
   }
 
   /**
    * Validates that account exists, throws exception if not found
-   * Type assertion ensures TypeScript knows account is not null after this check
    * @private
    */
   private validateAccountExists(account: any, accountId: string): asserts account {

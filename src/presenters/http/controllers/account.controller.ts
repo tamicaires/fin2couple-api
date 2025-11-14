@@ -4,6 +4,7 @@ import { CreateAccountUseCase } from '@application/account/useCases/create-accou
 import { ListAccountsUseCase } from '@application/account/useCases/list-accounts/list-accounts.use-case';
 import { UpdateAccountUseCase } from '@application/account/useCases/update-account/update-account.use-case';
 import { DeleteAccountUseCase } from '@application/account/useCases/delete-account/delete-account.use-case';
+import { ArchiveAccountUseCase } from '@application/account/useCases/archive-account/archive-account.use-case';
 import { CreateAccountDto } from '../dtos/account/create-account.dto';
 import { UpdateAccountDto } from '../dtos/account/update-account.dto';
 import { JwtAuthGuard } from '@infra/http/auth/guards/jwt-auth.guard';
@@ -21,6 +22,7 @@ export class AccountController {
     private readonly listAccountsUseCase: ListAccountsUseCase,
     private readonly updateAccountUseCase: UpdateAccountUseCase,
     private readonly deleteAccountUseCase: DeleteAccountUseCase,
+    private readonly archiveAccountUseCase: ArchiveAccountUseCase,
   ) {}
 
   @Post()
@@ -94,9 +96,9 @@ export class AccountController {
     });
   }
 
-  @Delete(':id')
+  @Patch(':id/archive')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete an account' })
+  @ApiOperation({ summary: 'Archive an account (soft delete)' })
   @ApiParam({
     name: 'id',
     description: 'Account ID',
@@ -104,11 +106,35 @@ export class AccountController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Account deleted successfully',
+    description: 'Account archived successfully',
   })
   @ApiResponse({
-    status: 400,
-    description: 'Cannot delete account with non-zero balance',
+    status: 404,
+    description: 'Account not found',
+  })
+  async archiveAccount(
+    @CoupleId() coupleId: string,
+    @UserId() userId: string,
+    @Param('id') accountId: string,
+  ) {
+    return this.archiveAccountUseCase.execute({
+      coupleId,
+      accountId,
+      userId,
+    });
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Permanently delete an account and ALL its transactions (IRREVERSIBLE)' })
+  @ApiParam({
+    name: 'id',
+    description: 'Account ID',
+    type: 'string',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Account and all transactions permanently deleted',
   })
   @ApiResponse({
     status: 404,
